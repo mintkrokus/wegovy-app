@@ -1,0 +1,799 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html>
+<html xmlns='http://www.w3.org/1999/xhtml' xmlns:b='http://www.google.com/2005/gml/b' xmlns:data='http://www.google.com/2005/gml/data' xmlns:expr='http://www.google.com/2005/gml/expr'>
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Wegovy 紀錄</title>
+    
+    <!-- iOS PWA 專用設定 -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Wegovy紀錄" />
+    <link rel="apple-touch-icon" href="https://img.icons8.com/color/180/syringe.png" />
+
+    <!-- 引入 React 與 Tailwind -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <b:skin><![CDATA[
+        body { background-color: #f8fafc; margin: 0; padding: 0; }
+        /* 強制隱藏 Blogger 預設的導覽列與其他干擾 */
+        .navbar { display: none !important; }
+        #navbar-iframe { display: none !important; height: 0 !important; visibility: hidden !important; }
+    ]]></b:skin>
+
+    <style>
+        * { -webkit-tap-highlight-color: transparent; user-select: none; }
+        input, textarea { user-select: text; }
+        body { background-color: #f8fafc; overscroll-behavior-y: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .safe-area-inset-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        .pt-safe { padding-top: env(safe-area-inset-top); }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+</head>
+<body>
+    <b:section id='main' showaddelement='no'>
+        <b:widget id='HTML1' locked='true' title='' type='HTML' version='2'>
+            <b:widget-settings>
+                <b:widget-setting name='content'></b:widget-setting>
+            </b:widget-settings>
+            <b:includable id='main'>
+                <!-- React 掛載點 -->
+            </b:includable>
+        </b:widget>
+    </b:section>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+    //<![CDATA[
+        const { useState, useEffect, useMemo } = React;
+
+        // --- 圖示定義 ---
+        const IconBase = ({ size = 24, color = "currentColor", children, ...props }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                {children}
+            </svg>
+        );
+
+        const Plus = (props) => <IconBase {...props}><path d="M5 12h14"/><path d="M12 5v14"/></IconBase>;
+        const Trash2 = (props) => <IconBase {...props}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconBase>;
+        const TrendingDown = (props) => <IconBase {...props}><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></IconBase>;
+        const Syringe = (props) => <IconBase {...props}><path d="m18 2 4 4"/><path d="m17 7 3-3"/><path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5"/><path d="m9 11 4 4"/><path d="m5 19-3 3"/><path d="m14 4 6 6"/></IconBase>;
+        const Calendar = (props) => <IconBase {...props}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></IconBase>;
+        const Scale = (props) => <IconBase {...props}><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2v2H3z"/><path d="M19 7h2v2h-2z"/></IconBase>;
+        const History = (props) => <IconBase {...props}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></IconBase>;
+        const Activity = (props) => <IconBase {...props}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></IconBase>;
+        const Save = (props) => <IconBase {...props}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></IconBase>;
+        const Edit2 = (props) => <IconBase {...props}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></IconBase>;
+        const RefreshCw = (props) => <IconBase {...props}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></IconBase>;
+        const User = (props) => <IconBase {...props}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></IconBase>;
+        const Target = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></IconBase>;
+        const Stethoscope = (props) => <IconBase {...props}><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></IconBase>;
+        const AlertCircle = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></IconBase>;
+        const ChevronRight = (props) => <IconBase {...props}><polyline points="9 18 15 12 9 6" /></IconBase>;
+
+        // --- APP LOGO (回復為純針筒) ---
+        const AppLogo = ({ size = 32, color = "white" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
+                <path d="m18 2 4 4"/>
+                <path d="m17 7 3-3"/>
+                <path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5"/>
+                <path d="m9 11 4 4"/>
+                <path d="m5 19-3 3"/>
+                <path d="m14 4 6 6"/>
+            </svg>
+        );
+
+        const Card = ({ children, className = "" }) => (
+            <div className={`bg-white rounded-xl shadow-sm border border-slate-100 ${className}`}>
+                {children}
+            </div>
+        );
+
+        // 劑量換算邏輯 (mg -> 格數)
+        const mgToClicks = (mg) => {
+            const val = parseFloat(mg);
+            if (isNaN(val) || val === 0) return 0;
+            // 使用者指定的標準
+            if (Math.abs(val - 0.25) < 0.01) return 19;
+            if (Math.abs(val - 0.5) < 0.01) return 37;
+            if (Math.abs(val - 0.75) < 0.01) return 56;
+            if (Math.abs(val - 1.0) < 0.01) return 75;
+            // 其他劑量以 1mg=75格 換算
+            return Math.round(val * 75);
+        };
+
+        const DOSAGE_SUGGESTIONS = [
+            { value: 0.25, label: '0.25' },
+            { value: 0.5, label: '0.5' },
+            { value: 0.75, label: '0.75' },
+            { value: 1.0, label: '1.0' },
+            { value: 1.7, label: '1.7' },
+            { value: 2.4, label: '2.4' },
+        ];
+
+        const COMMON_SYMPTOMS = [
+            '無副作用', '🤢 噁心', '🤮 嘔吐', '🚽 便秘', '💩 腹瀉', '🥴 頭暈', '😴 疲倦', '🤐 食慾不振', '🤕 頭痛', '🔥 胃食道逆流'
+        ];
+
+        function App() {
+            // --- 狀態管理 ---
+            const [records, setRecords] = useState(() => {
+                const savedRecords = localStorage.getItem('saxenda_records');
+                // 預設為空陣列，不使用預設資料
+                return savedRecords ? JSON.parse(savedRecords) : [];
+            });
+
+            // userProfile 安全讀取：合併預設值以防止舊資料缺欄位
+            const [userProfile, setUserProfile] = useState(() => {
+                const saved = localStorage.getItem('saxenda_profile');
+                const defaults = { 
+                    height: '', 
+                    targetWeight: '', 
+                    penTotal: 4.0, 
+                    currentPenStartDate: new Date().toISOString().split('T')[0],
+                    penCount: 1,
+                    isInitialized: false
+                };
+                return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+            });
+
+            // 初始化與路由
+            const [activeTab, setActiveTab] = useState('dashboard');
+            
+            // 如果未初始化，強制顯示 onboarding 頁面
+            useEffect(() => {
+                if (!userProfile.isInitialized) {
+                    setActiveTab('onboarding');
+                }
+            }, [userProfile.isInitialized]);
+
+            const [historyType, setHistoryType] = useState('injection');
+            const [showNotification, setShowNotification] = useState(false);
+            const [editingId, setEditingId] = useState(null);
+            const [recordType, setRecordType] = useState('injection');
+
+            // Form states
+            const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
+            const [formWeight, setFormWeight] = useState('');
+            const [formDosage, setFormDosage] = useState('0.25');
+            const [formNote, setFormNote] = useState('');
+            const [formSite, setFormSite] = useState('腹部');
+            const [formHeight, setFormHeight] = useState('');
+            const [formSymptoms, setFormSymptoms] = useState([]);
+
+            // Onboarding Form States - 確保這些變數存在
+            const [setupHeight, setSetupHeight] = useState('');
+            const [setupTarget, setSetupTarget] = useState('');
+            const [setupPenTotal, setSetupPenTotal] = useState('4.0');
+
+            useEffect(() => {
+                if (!userProfile.height) setFormHeight('');
+                else setFormHeight(userProfile.height);
+            }, [userProfile.height]);
+
+            useEffect(() => { localStorage.setItem('saxenda_records', JSON.stringify(records)); }, [records]);
+            useEffect(() => { localStorage.setItem('saxenda_profile', JSON.stringify(userProfile)); }, [userProfile]);
+
+            const formatDateWithDay = (dateStr) => {
+                if (!dateStr) return '';
+                const days = ['日', '一', '二', '三', '四', '五', '六'];
+                const [y, m, d] = dateStr.split('-').map(Number);
+                const date = new Date(y, m - 1, d);
+                const dayName = days[date.getDay()];
+                return `${y}/${m.toString().padStart(2, '0')}/${d.toString().padStart(2, '0')}(${dayName})`;
+            };
+
+            const sortedRecords = useMemo(() => {
+                return [...records].sort((a, b) => new Date(b.date) - new Date(a.date));
+            }, [records]);
+
+            const displayedHistory = useMemo(() => {
+                return sortedRecords.filter(r => {
+                    if (historyType === 'injection') return r.dosage > 0;
+                    return r.weight !== null && r.weight !== '' && !isNaN(r.weight);
+                });
+            }, [sortedRecords, historyType]);
+
+            const stats = useMemo(() => {
+                const validWeightRecords = records.filter(r => r.weight !== null && r.weight !== '' && !isNaN(r.weight));
+                const latestInjection = [...records].sort((a, b) => new Date(a.date) - new Date(b.date)).reverse().find(r => r.dosage > 0);
+                
+                // 計算當前筆的消耗量
+                const currentPenRecords = records.filter(r => r.date >= userProfile.currentPenStartDate);
+                const totalUsed = currentPenRecords.reduce((acc, curr) => acc + (curr.dosage || 0), 0);
+                const remaining = Math.max(0, userProfile.penTotal - totalUsed);
+                const remainingClicks = mgToClicks(remaining);
+                
+                const lastDose = latestInjection ? latestInjection.dosage : 0;
+                const lastInjectionDate = latestInjection ? latestInjection.date : null;
+
+                let nextInjectionDate = null;
+                let daysUntilNext = null;
+                if (lastInjectionDate) {
+                    const nextDateObj = new Date(lastInjectionDate);
+                    nextDateObj.setDate(nextDateObj.getDate() + 7);
+                    nextInjectionDate = nextDateObj.toISOString().split('T')[0];
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    nextDateObj.setHours(0,0,0,0);
+                    daysUntilNext = Math.ceil((nextDateObj - today) / (1000 * 60 * 60 * 24));
+                }
+
+                // 修正：如果沒有打針紀錄，預設以 0.25 計算剩餘次數，避免除以 0 或顯示 0 次
+                const calculationBaseDose = lastDose > 0 ? lastDose : 0.25;
+                const dosesLeft = Math.floor(remaining / calculationBaseDose);
+                const progressPercent = Math.min(100, Math.max(0, (remaining / userProfile.penTotal) * 100));
+
+                let weightStats = { current: 0, start: 0, loss: 0, bmi: 0 };
+                if (validWeightRecords.length > 0) {
+                    const timeSortedWeights = [...validWeightRecords].sort((a, b) => new Date(a.date) - new Date(b.date));
+                    const latest = timeSortedWeights[timeSortedWeights.length - 1];
+                    const first = timeSortedWeights[0];
+                    const current = parseFloat(latest.weight);
+                    const start = parseFloat(first.weight);
+                    const h = userProfile.height / 100;
+                    weightStats = {
+                        current: current.toFixed(1),
+                        start: start.toFixed(1),
+                        loss: (start - current).toFixed(1),
+                        bmi: (current / (h * h)).toFixed(1)
+                    };
+                }
+
+                return { 
+                    ...weightStats, 
+                    lastDose, 
+                    lastInjectionDate, 
+                    nextInjectionDate, 
+                    daysUntilNext, 
+                    totalUsed, 
+                    remaining: remaining.toFixed(2), 
+                    remainingClicks,
+                    dosesLeft, 
+                    progressPercent,
+                    calculationBaseDose // 將計算基準傳回，用於顯示
+                };
+            }, [records, userProfile]);
+
+            // --- Handler Functions ---
+
+            const handleCompleteSetup = (e) => {
+                e.preventDefault();
+                if (!setupHeight || !setupTarget || !setupPenTotal) return;
+                
+                setUserProfile({
+                    ...userProfile,
+                    height: parseFloat(setupHeight),
+                    targetWeight: parseFloat(setupTarget),
+                    penTotal: parseFloat(setupPenTotal),
+                    isInitialized: true,
+                    currentPenStartDate: new Date().toISOString().split('T')[0]
+                });
+                setActiveTab('dashboard');
+            };
+
+            const handleAddRecord = (e) => {
+                e.preventDefault();
+                if (!formDate) return;
+
+                // 檢查剩餘劑量警示
+                if (recordType === 'injection') {
+                    const dose = parseFloat(formDosage);
+                    const currentRemaining = parseFloat(stats.remaining);
+                    
+                    if (dose > currentRemaining) {
+                        const confirmMsg = `⚠️ 剩餘劑量不足！\n\n目前剩餘：${currentRemaining} mg\n預計施打：${dose} mg\n\n這可能會用到下一支筆，確定要儲存嗎？`;
+                        if (!window.confirm(confirmMsg)) {
+                            return; // 使用者取消
+                        }
+                    }
+                }
+
+                const newRecord = {
+                    id: editingId || Date.now(),
+                    date: formDate,
+                    weight: recordType === 'weight' ? (formWeight ? parseFloat(formWeight) : null) : null,
+                    dosage: recordType === 'injection' ? parseFloat(formDosage) : 0,
+                    site: recordType === 'injection' ? formSite : '',
+                    note: formNote,
+                    symptoms: recordType === 'injection' ? formSymptoms : []
+                };
+
+                if (editingId) setRecords(prev => prev.map(r => r.id === editingId ? newRecord : r));
+                else setRecords(prev => [...prev, newRecord]);
+
+                setFormDate(new Date().toISOString().split('T')[0]);
+                setFormWeight('');
+                setFormNote('');
+                setFormSymptoms([]);
+                setShowNotification(true);
+                setTimeout(() => setShowNotification(false), 3000);
+                setActiveTab('dashboard');
+            };
+
+            const handleEdit = (record) => {
+                setFormDate(record.date);
+                setFormWeight(record.weight || '');
+                setFormNote(record.note);
+                if (record.dosage > 0) {
+                    setRecordType('injection');
+                    setFormDosage(record.dosage);
+                    setFormSite(record.site);
+                    setFormSymptoms(record.symptoms || []);
+                } else {
+                    setRecordType('weight');
+                    setFormSymptoms([]);
+                }
+                setEditingId(record.id);
+                setActiveTab('add');
+            };
+
+            const handleDelete = (id) => {
+                if (window.confirm('確定要刪除這筆紀錄嗎？')) setRecords(prev => prev.filter(r => r.id !== id));
+            };
+
+            const handleResetPen = () => {
+                const today = new Date().toISOString().split('T')[0];
+                if (window.confirm(`確定要啟用新筆（第 ${userProfile.penCount + 1} 支）嗎？\n\n・舊筆的施打紀錄會保留\n・計算剩餘量將從今天重新開始\n・筆的編號會自動 +1`)) {
+                    setUserProfile(prev => ({ 
+                        ...prev, 
+                        currentPenStartDate: today,
+                        penCount: (prev.penCount || 1) + 1 
+                    }));
+                    alert('已啟用新筆！');
+                }
+            };
+
+            const toggleSymptom = (sym) => {
+                if (formSymptoms.includes(sym)) setFormSymptoms(prev => prev.filter(s => s !== sym));
+                else {
+                    if (sym === '無副作用') setFormSymptoms(['無副作用']);
+                    else setFormSymptoms(prev => [...prev.filter(s => s !== '無副作用'), sym]);
+                }
+            };
+
+            // --- Components ---
+            const SyringeGauge = ({ percentage, remaining, remainingClicks }) => {
+                const barrelWidth = 140; const barrelStart = 50;
+                const liquidWidth = (percentage / 100) * barrelWidth;
+                const liquidX = barrelStart + (barrelWidth - liquidWidth);
+                const plungerHeadX = liquidX;
+
+                return (
+                    <div className="w-full py-4 flex items-center justify-center">
+                        <svg width="100%" height="80" viewBox="0 0 240 80" className="drop-shadow-sm overflow-visible">
+                            <defs>
+                                <linearGradient id="liquidGradient" x1="0" x2="1" y1="0" y2="0">
+                                    <stop offset="0%" stopColor="#2dd4bf" />
+                                    <stop offset="100%" stopColor="#0d9488" />
+                                </linearGradient>
+                            </defs>
+                            <text x={barrelStart + barrelWidth / 2} y="12" fontSize="14" fontWeight="bold" fill="#0d9488" textAnchor="middle">
+                                剩餘 {Math.round(percentage)}%
+                            </text>
+                            <g transform="translate(0, 15)">
+                                <g className="transition-all duration-1000 ease-out" style={{ transform: `translateX(${plungerHeadX - 55}px)` }}>
+                                    <rect x="0" y="27" width="50" height="6" fill="#cbd5e1" rx="2" />
+                                    <rect x="-5" y="20" width="8" height="20" fill="#94a3b8" rx="2" />
+                                    <path d="M 50 22 L 55 22 L 55 38 L 50 38 Q 48 30 50 22" fill="#475569" />
+                                </g>
+                                <rect x={barrelStart} y="15" width={barrelWidth} height="30" rx="4" fill="#f8fafc" stroke="#94a3b8" strokeWidth="2" />
+                                <rect x={liquidX} y="17" width={Math.max(0, liquidWidth - 2)} height="26" rx="1" fill="url(#liquidGradient)" className="transition-all duration-1000 ease-out" opacity={percentage > 0 ? 1 : 0} />
+                                {[0.2, 0.4, 0.6, 0.8].map((p, i) => (<line key={i} x1={barrelStart + (barrelWidth * p)} y1="15" x2={barrelStart + (barrelWidth * p)} y2="22" stroke="#94a3b8" strokeWidth="1" />))}
+                                {[0.2, 0.4, 0.6, 0.8].map((p, i) => (<line key={`b-${i}`} x1={barrelStart + (barrelWidth * p)} y1="38" x2={barrelStart + (barrelWidth * p)} y2="45" stroke="#94a3b8" strokeWidth="1" />))}
+                                <rect x={barrelStart + barrelWidth} y="22" width="10" height="16" fill="#cbd5e1" />
+                                <rect x={barrelStart + barrelWidth + 10} y="28" width="20" height="4" fill="#94a3b8" />
+                                <text x={barrelStart + barrelWidth / 2} y="58" fontSize="10" fill="#64748b" textAnchor="middle">{remaining} mg ({remainingClicks}格)</text>
+                            </g>
+                        </svg>
+                    </div>
+                );
+            };
+
+            const SimpleLineChart = ({ data }) => {
+                const validData = data.filter(r => r.weight !== null && r.weight !== '' && !isNaN(r.weight));
+                if (!validData || validData.length < 2) return (
+                    <div className="h-48 flex items-center justify-center text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200"><p className="text-sm">輸入兩筆以上體重後顯示趨勢圖</p></div>
+                );
+                const chartData = [...validData].sort((a, b) => new Date(a.date) - new Date(b.date)).map(r => ({ date: r.date, val: r.weight }));
+                const weights = chartData.map(d => d.val);
+                const min = Math.min(...weights) - 1; const max = Math.max(...weights) + 1;
+                const range = max - min; const w = 100; const h = 50;
+                const points = chartData.map((d, i) => {
+                    const x = (i / (chartData.length - 1)) * w;
+                    const y = h - ((d.val - min) / range) * h;
+                    return `${x},${y}`;
+                }).join(' ');
+                
+                return (
+                    <div className="w-full h-48 mt-4">
+                        <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full overflow-visible">
+                            {[0, 0.25, 0.5, 0.75, 1].map(p => (<line key={p} x1="0" y1={p * h} x2={w} y2={p * h} stroke="#e2e8f0" strokeWidth="0.2" />))}
+                            <polyline fill="none" stroke="#0d9488" strokeWidth="1" points={points} strokeLinecap="round" strokeLinejoin="round" />
+                            {chartData.map((d, i) => {
+                                const x = (i / (chartData.length - 1)) * w;
+                                const y = h - ((d.val - min) / range) * h;
+                                return (
+                                    <g key={i} className="group">
+                                        <circle cx={x} cy={y} r="1.5" fill="white" stroke="#0d9488" strokeWidth="0.5" />
+                                    </g>
+                                );
+                            })}
+                        </svg>
+                        <div className="flex justify-between text-xs text-slate-400 mt-2">
+                            <span>{formatDateWithDay(chartData[0].date).slice(5)}</span>
+                            <span>{formatDateWithDay(chartData[chartData.length - 1].date).slice(5)}</span>
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- Render Logic ---
+
+            if (activeTab === 'onboarding') {
+                return (
+                    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex items-center justify-center p-4 safe-area-inset-bottom">
+                        <Card className="w-full max-w-md p-6 shadow-xl">
+                            <div className="text-center mb-6">
+                                <div className="bg-teal-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <AppLogo size={48} color="#0d9488" />
+                                </div>
+                                <h1 className="text-2xl font-bold text-slate-800">歡迎使用 Wegovy 紀錄</h1>
+                                <p className="text-slate-500 mt-1">初次使用請設定您的基本資料</p>
+                            </div>
+                            
+                            <form onSubmit={handleCompleteSetup} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">身高 (cm)</label>
+                                    <input 
+                                        type="number" 
+                                        required
+                                        placeholder="例如: 170"
+                                        value={setupHeight} 
+                                        onChange={(e) => setSetupHeight(e.target.value)} 
+                                        className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none" 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">目標體重 (kg)</label>
+                                    <input 
+                                        type="number" 
+                                        required
+                                        placeholder="例如: 60"
+                                        value={setupTarget} 
+                                        onChange={(e) => setSetupTarget(e.target.value)} 
+                                        className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none" 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">藥筆總容量 (mg)</label>
+                                    <input 
+                                        type="number" 
+                                        step="0.1"
+                                        required
+                                        value={setupPenTotal} 
+                                        onChange={(e) => setSetupPenTotal(e.target.value)} 
+                                        className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none" 
+                                    />
+                                    <p className="text-xs text-slate-400 mt-1">預設 4.0mg (0.25mg 可打 16 次)</p>
+                                </div>
+                                
+                                <button 
+                                    type="submit" 
+                                    className="w-full bg-teal-600 text-white py-3 rounded-xl font-bold shadow-md hover:bg-teal-700 transition mt-4 flex items-center justify-center gap-2"
+                                >
+                                    開始使用 <ChevronRight size={18} />
+                                </button>
+                            </form>
+                            
+                            <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-2 text-xs text-amber-800">
+                                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                                <p>紀錄只會儲存在你的裝置，不會上傳到其他空間；如果刪除APP或換裝置登入就會消失。</p>
+                            </div>
+                        </Card>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-24 safe-area-inset-bottom">
+                    <header className="bg-teal-600 text-white p-4 shadow-md sticky top-0 z-20 pt-safe">
+                        <div className="max-w-md mx-auto flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <AppLogo size={28} />
+                                <h1 className="text-xl font-bold tracking-wide">Wegovy 紀錄</h1>
+                            </div>
+                            <button onClick={() => setActiveTab('settings')} className="text-teal-100 hover:text-white text-sm">設定</button>
+                        </div>
+                    </header>
+
+                    <main className="max-w-md mx-auto p-4 space-y-4">
+                        {showNotification && (
+                            <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-6 py-2 rounded-full shadow-lg z-50 animate-bounce flex items-center gap-2">
+                                <Save size={16} /> 紀錄已儲存！
+                            </div>
+                        )}
+
+                        {activeTab === 'dashboard' && (
+                            <div className="space-y-4">
+                                {stats.lastDose > 0 && stats.dosesLeft <= 2 && (
+                                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start gap-3 animate-pulse">
+                                        <AlertCircle className="text-orange-500 shrink-0 mt-0.5" size={20} />
+                                        <div>
+                                            <h3 className="font-bold text-orange-700 text-sm">藥量庫存預警</h3>
+                                            <p className="text-xs text-orange-600 mt-1">
+                                                目前預估剩餘劑量僅剩 {stats.dosesLeft} 次（約 {stats.dosesLeft} 週）。<br/>
+                                                建議您盡快安排回診或購買新的藥筆，以免中斷療程。
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <Card className="p-4 bg-white border-teal-100 shadow-md">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <h3 className="font-bold text-slate-700 flex items-center gap-2"><Syringe className="text-teal-500" size={20} />藥物監控</h3>
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-xs text-slate-400 font-bold mb-0.5">目前使用：第 {userProfile.penCount} 支</span>
+                                            <span className="text-sm font-bold text-teal-700">約 {stats.dosesLeft} 次</span>
+                                            <span className="text-[10px] text-slate-400">(以 {stats.calculationBaseDose}mg / {mgToClicks(stats.calculationBaseDose)}格 推算)</span>
+                                        </div>
+                                    </div>
+                                    <SyringeGauge percentage={stats.progressPercent} remaining={stats.remaining} remainingClicks={stats.remainingClicks} />
+                                    <div className="grid grid-cols-2 gap-4 mt-2 pt-2 border-t border-slate-50">
+                                        <div>
+                                            <span className="block text-[10px] uppercase tracking-wider mb-0.5 text-slate-400">LAST DOSE</span>
+                                            <div className="flex items-baseline gap-1">
+                                                <span className="font-bold text-slate-700 text-sm">{stats.lastDose} mg</span>
+                                                <span className="text-[10px] text-slate-400 text-teal-600 font-bold">({mgToClicks(stats.lastDose)}格)</span>
+                                            </div>
+                                            <span className="text-[10px] text-slate-400 block mt-0.5">{stats.lastInjectionDate ? formatDateWithDay(stats.lastInjectionDate) : ''}</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="block text-[10px] uppercase tracking-wider mb-0.5 text-slate-400">NEXT DOSE</span>
+                                            {stats.nextInjectionDate ? (
+                                                <div>
+                                                    <div className={`font-bold text-sm ${stats.daysUntilNext <= 1 ? 'text-red-500' : 'text-slate-700'}`}>
+                                                        {stats.daysUntilNext <= 0 ? '今天!' : `${stats.daysUntilNext} 天後`}
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400">{formatDateWithDay(stats.nextInjectionDate)}</div>
+                                                </div>
+                                            ) : <span className="text-xs text-slate-300">--</span>}
+                                        </div>
+                                    </div>
+                                </Card>
+
+                                <Card className="p-5 bg-gradient-to-br from-teal-500 to-teal-600 text-white border-none shadow-lg">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <p className="text-teal-100 text-xs font-medium mb-1">目前體重</p>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-4xl font-bold tracking-tight">{stats.current > 0 ? stats.current : '--'}</span>
+                                                <span className="text-lg opacity-80">kg</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right bg-white/10 px-3 py-2 rounded-lg backdrop-blur-sm">
+                                            <p className="text-teal-100 text-[10px] mb-0.5">BMI ({userProfile.height}cm)</p>
+                                            <span className="text-xl font-bold">{stats.bmi > 0 ? stats.bmi : '--'}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 mb-4">
+                                        <div className="flex items-center gap-1.5 bg-white/20 px-2 py-1 rounded text-xs"><TrendingDown size={14} /><span>已減 {stats.loss} kg</span></div>
+                                        <div className="flex items-center gap-1.5 bg-white/20 px-2 py-1 rounded text-xs"><Target size={14} /><span>目標 {userProfile.targetWeight} kg</span></div>
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between text-[10px] text-teal-100 mb-1">
+                                            <span>起始: {stats.start} kg</span>
+                                            <span>剩餘: {(stats.current - userProfile.targetWeight).toFixed(1)} kg</span>
+                                        </div>
+                                        <div className="w-full bg-black/20 rounded-full h-2 overflow-hidden">
+                                            <div className="bg-white h-2 rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(255,255,255,0.5)]" style={{ width: `${stats.current > 0 ? Math.min(100, Math.max(0, ((stats.start - stats.current) / (stats.start - userProfile.targetWeight)) * 100)) : 0}%` }}></div>
+                                        </div>
+                                    </div>
+                                </Card>
+
+                                <Card className="p-4">
+                                    <h3 className="font-semibold text-slate-700 mb-2 flex items-center gap-2"><TrendingDown size={18} className="text-teal-500"/>體重趨勢</h3>
+                                    <SimpleLineChart data={records} />
+                                </Card>
+                            </div>
+                        )}
+
+                        {activeTab === 'add' && (
+                            <div className="animate-fade-in">
+                                <Card className="p-5">
+                                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">{editingId ? <Edit2 className="text-teal-500" /> : <Plus className="text-teal-500" />} {editingId ? '編輯紀錄' : '新增紀錄'}</h2>
+                                    <div className="flex p-1 bg-slate-100 rounded-lg mb-4">
+                                        <button type="button" onClick={() => setRecordType('injection')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all flex items-center justify-center gap-2 ${recordType === 'injection' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><Syringe size={16} /> 打針紀錄</button>
+                                        <button type="button" onClick={() => setRecordType('weight')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all flex items-center justify-center gap-2 ${recordType === 'weight' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><Scale size={16} /> 體重紀錄</button>
+                                    </div>
+                                    <form onSubmit={handleAddRecord} className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-600 mb-1">日期</label>
+                                            <div className="relative">
+                                                <Calendar className="absolute left-3 top-3 text-slate-400" size={18} />
+                                                <input type="date" required value={formDate} onChange={(e) => setFormDate(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                                                <p className="text-xs text-slate-400 mt-1 pl-1">{formatDateWithDay(formDate)}</p>
+                                            </div>
+                                        </div>
+                                        {recordType === 'weight' && (
+                                            <div className="animate-fade-in">
+                                                <label className="block text-sm font-medium text-slate-600 mb-1">體重 (kg)</label>
+                                                <div className="relative">
+                                                    <Scale className="absolute left-3 top-3 text-slate-400" size={18} />
+                                                    <input type="number" step="0.1" required placeholder="請輸入體重" value={formWeight} onChange={(e) => setFormWeight(e.target.value)} className="w-full pl-10 pr-2 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                </div>
+                                            </div>
+                                        )}
+                                        {recordType === 'injection' && (
+                                            <div className="animate-fade-in space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-600 mb-1">施打劑量 (mg)</label>
+                                                    <div className="flex gap-2 mb-2">
+                                                        <div className="relative flex-1">
+                                                            <Syringe className="absolute left-3 top-3 text-slate-400" size={18} />
+                                                            <input type="number" step="0.01" required value={formDosage} onChange={(e) => setFormDosage(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 font-bold text-teal-700" />
+                                                        </div>
+                                                        {/* 顯示換算格數 */}
+                                                        <div className="flex items-center justify-center bg-teal-50 border border-teal-200 text-teal-700 rounded-lg px-3 min-w-[80px]">
+                                                            <span className="font-bold text-lg">{mgToClicks(formDosage)}</span>
+                                                            <span className="text-xs ml-1">格</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-5 gap-1">
+                                                        {DOSAGE_SUGGESTIONS.map((opt) => (
+                                                            <button type="button" key={opt.value} onClick={() => setFormDosage(opt.value.toString())} className={`py-1 px-0.5 text-xs rounded border transition flex flex-col items-center justify-center h-10 ${parseFloat(formDosage) === opt.value ? 'bg-teal-50 border-teal-500 text-teal-700 font-medium' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>
+                                                                <span>{opt.value}</span>
+                                                                <span className="text-[9px] opacity-70">({mgToClicks(opt.value)}格)</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-600 mb-1">施打部位</label>
+                                                    <div className="flex gap-2">
+                                                        {['腹部', '大腿', '手臂'].map(site => (
+                                                            <button type="button" key={site} onClick={() => setFormSite(site)} className={`flex-1 py-2 text-sm rounded-lg border transition ${formSite === site ? 'bg-teal-50 border-teal-500 text-teal-700' : 'border-slate-200 text-slate-600'}`}>{site}</button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-600 mb-1 flex items-center gap-1"><Stethoscope size={14}/> 身體反應 / 副作用</label>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {COMMON_SYMPTOMS.map(sym => (
+                                                            <button key={sym} type="button" onClick={() => toggleSymptom(sym)} className={`px-3 py-1.5 text-xs rounded-full border transition ${formSymptoms.includes(sym) ? 'bg-red-50 border-red-400 text-red-700 font-bold' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>{sym}</button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-600 mb-1">備註</label>
+                                            <textarea value={formNote} onChange={(e) => setFormNote(e.target.value)} placeholder="紀錄更多細節..." className="w-full p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm h-20" />
+                                        </div>
+                                        <div className="pt-2 flex gap-3">
+                                            {editingId && <button type="button" onClick={() => { setEditingId(null); setActiveTab('history'); }} className="flex-1 bg-slate-200 text-slate-700 py-3 rounded-lg font-bold hover:bg-slate-300 transition">取消</button>}
+                                            <button type="submit" className="flex-1 bg-teal-600 text-white py-3 rounded-lg font-bold shadow-md hover:bg-teal-700 transition">{editingId ? '更新紀錄' : '儲存紀錄'}</button>
+                                        </div>
+                                    </form>
+                                </Card>
+                            </div>
+                        )}
+
+                        {activeTab === 'history' && (
+                            <div className="space-y-3 animate-fade-in">
+                                <div className="flex justify-between items-center mb-1"><h3 className="font-bold text-slate-700">歷史紀錄 ({displayedHistory.length})</h3></div>
+                                <div className="flex p-1 bg-slate-100 rounded-lg mb-2">
+                                    <button onClick={() => setHistoryType('injection')} className={`flex-1 py-2 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-2 ${historyType === 'injection' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-600'}`}><Syringe size={16} /> 施打紀錄</button>
+                                    <button onClick={() => setHistoryType('weight')} className={`flex-1 py-2 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-2 ${historyType === 'weight' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-600'}`}><Scale size={16} /> 體重紀錄</button>
+                                </div>
+                                {displayedHistory.length === 0 ? (
+                                    <div className="text-center py-10 text-slate-400"><History size={48} className="mx-auto mb-2 opacity-20" /><p>目前沒有{historyType === 'injection' ? '施打' : '體重'}紀錄</p></div>
+                                ) : (
+                                    displayedHistory.map((record) => (
+                                        <Card key={record.id} className="p-4 flex flex-col gap-2 hover:bg-slate-50 transition group">
+                                            <div className="flex justify-between items-start" onClick={() => handleEdit(record)}>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-slate-800">{formatDateWithDay(record.date)}</span>
+                                                    {(historyType === 'injection' || record.dosage > 0) && <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500">{record.site}</span>}
+                                                </div>
+                                                <div className="flex gap-4 text-sm items-center">
+                                                    {historyType === 'weight' ? <span className="text-blue-600 font-bold flex items-center gap-1 text-base"><Scale size={16} /> {record.weight} kg</span> : 
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="text-teal-600 font-bold flex items-center gap-1 text-base"><Syringe size={16} /> {record.dosage} mg</span>
+                                                        <span className="text-[10px] text-slate-400">({mgToClicks(record.dosage)}格)</span>
+                                                    </div>
+                                                    }
+                                                </div>
+                                            </div>
+                                            {historyType === 'injection' && record.symptoms && record.symptoms.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 mt-1">{record.symptoms.map(s => (<span key={s} className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100">{s}</span>))}</div>
+                                            )}
+                                            <div className="flex justify-between items-end mt-1">
+                                                {record.note && <p className="text-xs text-slate-400 line-clamp-1 flex-1 mr-2">{record.note}</p>}
+                                                <div className="flex gap-1 ml-auto">
+                                                    <button onClick={() => handleEdit(record)} className="p-1.5 text-slate-300 hover:text-teal-600 transition"><Edit2 size={16} /></button>
+                                                    <button onClick={() => handleDelete(record.id)} className="p-1.5 text-slate-300 hover:text-red-500 transition"><Trash2 size={16} /></button>
+                                                </div>
+                                            </div>
+                                        </Card>
+                                    ))
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'settings' && (
+                            <div className="animate-fade-in">
+                                <Card className="p-5">
+                                    <h2 className="text-lg font-bold text-slate-800 mb-4">個人設定</h2>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-600 mb-1">身高 (cm)</label>
+                                            <input type="number" value={userProfile.height} onChange={(e) => setUserProfile({...userProfile, height: parseFloat(e.target.value)})} className="w-full p-2 border border-slate-200 rounded-lg" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-600 mb-1">目標體重 (kg)</label>
+                                            <input type="number" value={userProfile.targetWeight} onChange={(e) => setUserProfile({...userProfile, targetWeight: parseFloat(e.target.value)})} className="w-full p-2 border border-slate-200 rounded-lg" />
+                                        </div>
+                                        <div className="pt-4 border-t border-slate-100 mt-4">
+                                            <h3 className="text-sm font-medium text-slate-600 mb-2">藥筆設定</h3>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-600 mb-1">藥筆總容量 (mg)</label>
+                                                    <input type="number" step="0.1" value={userProfile.penTotal} onChange={(e) => setUserProfile({...userProfile, penTotal: parseFloat(e.target.value)})} className="w-full p-2 border border-slate-200 rounded-lg" />
+                                                    <p className="text-xs text-slate-400 mt-1">預設 4.0mg (0.25mg x 16次) = 300格</p>
+                                                </div>
+                                                <button onClick={handleResetPen} className="flex items-center justify-center gap-2 w-full text-teal-600 text-sm border border-teal-200 px-3 py-2 rounded hover:bg-teal-50"><RefreshCw size={14} /> 啟用新的一支筆 (重置計數)</button>
+                                            </div>
+                                        </div>
+                                        <div className="pt-4 border-t border-slate-100 mt-4">
+                                            <h3 className="text-sm font-medium text-slate-600 mb-2">資料管理</h3>
+                                            <button onClick={() => { if(window.confirm('確定要清除所有資料嗎？此動作無法復原。')) { setRecords([]); localStorage.removeItem('saxenda_records'); localStorage.removeItem('saxenda_profile'); alert('資料已清空，請重新整理頁面'); window.location.reload(); } }} className="text-red-500 text-sm border border-red-200 px-3 py-2 rounded hover:bg-red-50 w-full">清除所有紀錄</button>
+                                        </div>
+                                    </div>
+                                    <div className="mt-6 flex justify-end"><button onClick={() => setActiveTab('dashboard')} className="bg-slate-800 text-white px-6 py-2 rounded-lg">完成</button></div>
+                                </Card>
+                            </div>
+                        )}
+                    </main>
+
+                    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-3 z-50 pb-safe w-full max-w-md mx-auto shadow-[0_-1px_10px_rgba(0,0,0,0.05)]">
+                        <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center text-xs ${activeTab === 'dashboard' ? 'text-teal-600' : 'text-slate-400'}`}><Activity size={24} className="mb-1" />總覽</button>
+                        <div className="relative -top-6">
+                            <button 
+                                onClick={() => { 
+                                    setEditingId(null); 
+                                    setFormDate(new Date().toISOString().split('T')[0]); 
+                                    setFormWeight(''); 
+                                    setFormNote(''); 
+                                    setFormSymptoms([]); 
+                                    setFormHeight(userProfile.height); 
+                                    setRecordType('injection'); 
+                                    setActiveTab('add'); 
+                                }} 
+                                className={`flex flex-col items-center justify-center text-xs ${activeTab === 'add' ? 'text-teal-600' : 'text-slate-400'}`}
+                            >
+                                <div className="bg-teal-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg border-4 border-white active:scale-95 transition-transform absolute top-0 pointer-events-auto">
+                                    <Plus size={28} />
+                                </div>
+                                <span className="mt-14 font-bold">紀錄</span>
+                            </button>
+                        </div>
+                        <button onClick={() => setActiveTab('history')} className={`flex flex-col items-center text-xs ${activeTab === 'history' ? 'text-teal-600' : 'text-slate-400'}`}><History size={24} className="mb-1" />歷程</button>
+                    </nav>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    //]]>
+    </script>
+</body>
+</html>
