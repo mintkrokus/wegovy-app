@@ -158,7 +158,6 @@
             // --- 狀態管理 ---
             const [records, setRecords] = useState(() => {
                 const savedRecords = localStorage.getItem('saxenda_records');
-                // 這裡改為空陣列，不使用任何預設測試資料
                 return savedRecords ? JSON.parse(savedRecords) : [];
             });
 
@@ -194,7 +193,7 @@
             const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
             const [formWeight, setFormWeight] = useState('');
             const [formDosage, setFormDosage] = useState('0.25');
-            const [formNote, setFormNote] = useState(''); // Keep state variable to prevent ReferenceError, but not used in UI
+            const [formNote, setFormNote] = useState(''); // Keep state variable to prevent ReferenceError
             const [formSite, setFormSite] = useState('腹部');
             const [formHeight, setFormHeight] = useState('');
             const [formSymptoms, setFormSymptoms] = useState([]);
@@ -336,8 +335,10 @@
                     const currentRemaining = parseFloat(stats.remaining);
                     
                     if (dose > currentRemaining) {
-                        setShowInsufficientModal(true);
-                        return; 
+                        const confirmMsg = `⚠️ 剩餘劑量不足！\n\n目前剩餘：${currentRemaining} mg\n預計施打：${dose} mg\n\n這可能會用到下一支筆，確定要儲存嗎？`;
+                        if (!window.confirm(confirmMsg)) {
+                            return; 
+                        }
                     }
                 }
 
@@ -650,7 +651,7 @@
                         )}
 
                         {activeTab === 'dashboard' && (
-                            <div className="space-y-4">
+                            <div className="space-y-4 pb-48"> {/* Increased padding bottom for dashboard */}
                                 {stats.lastDose > 0 && stats.dosesLeft <= 2 && (
                                     <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start gap-3 animate-pulse shadow-sm">
                                         <AlertCircle className="text-orange-500 shrink-0 mt-0.5" size={20} />
@@ -736,7 +737,7 @@
                         )}
 
                         {activeTab === 'add' && (
-                            <div className="animate-fade-in space-y-4 pb-24"> 
+                            <div className="animate-fade-in space-y-4 pb-48"> {/* Increased padding bottom for add screen */}
                                 <Card className="p-5 border-primary-100 shadow-sm bg-white">
                                     <h2 className="text-lg font-bold text-slate-800 mb-5 flex items-center gap-2 border-b border-slate-100 pb-3">
                                         {editingId ? <Edit2 className="text-primary-600" /> : <Plus className="text-primary-600" />} 
@@ -876,14 +877,13 @@
                                                 </div>
                                             </div>
                                         )}
-                                        {/* Note field removed from UI */}
                                     </form>
                                 </Card>
                             </div>
                         )}
 
                         {activeTab === 'history' && (
-                            <div className="space-y-3 animate-fade-in pb-20">
+                            <div className="space-y-3 animate-fade-in pb-48"> {/* Increased padding bottom for history */}
                                 <div className="flex justify-between items-center mb-1 px-1"><h3 className="font-bold text-slate-700 text-lg">歷史紀錄</h3><span className="text-xs text-slate-400 font-medium bg-slate-100 px-2 py-1 rounded-full">{displayedHistory.length} 筆</span></div>
                                 <div className="flex p-1 bg-slate-100 rounded-xl mb-4">
                                     <button onClick={() => setHistoryType('injection')} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${historyType === 'injection' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><Syringe size={16} /> 施打紀錄</button>
@@ -914,10 +914,9 @@
                                                     }
                                                 </div>
                                                 
-                                                {/* 施打部位或備註 */}
+                                                {/* 施打部位 */}
                                                 <div className="flex flex-wrap gap-2 mt-0.5">
                                                      {(historyType === 'injection' || record.dosage > 0) && <span className="text-xs text-slate-500 flex items-center gap-1"><Target size={10}/> {record.site}</span>}
-                                                     {record.note && <span className="text-xs text-slate-400 flex items-center gap-1 max-w-[150px] truncate"><FileText size={10}/> {record.note}</span>}
                                                 </div>
                                                 
                                                 {/* 副作用標籤 */}
@@ -940,7 +939,7 @@
                         )}
 
                         {activeTab === 'settings' && (
-                            <div className="animate-fade-in pb-20">
+                            <div className="animate-fade-in pb-48"> {/* Increased padding bottom for settings */}
                                 <Card className="p-5 border-primary-100 shadow-md">
                                     <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><User className="text-primary-600"/>個人設定</h2>
                                     <div className="space-y-6">
@@ -1075,7 +1074,7 @@
                                     setEditingId(null); 
                                     setFormDate(new Date().toISOString().split('T')[0]); 
                                     setFormWeight(''); 
-                                    setFormNote('');
+                                    // setFormNote is fully removed
                                     setFormSymptoms([]); 
                                     setFormHeight(userProfile.height); 
                                     setRecordType('weight'); // Default to weight
