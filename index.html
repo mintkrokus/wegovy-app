@@ -119,7 +119,7 @@
             </div>
         );
 
-        // 劑量換算邏輯 (mg -> 格數)
+        // 劑量換算邏輯
         const mgToClicks = (mg) => {
             const val = parseFloat(mg);
             if (isNaN(val) || val === 0) return 0;
@@ -130,7 +130,6 @@
             return Math.round(val * 75);
         };
         
-        // 格數 -> mg (反向換算)
         const clicksToMg = (clicks) => {
             const c = parseInt(clicks);
             if (isNaN(c) || c === 0) return 0;
@@ -193,7 +192,8 @@
             const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
             const [formWeight, setFormWeight] = useState('');
             const [formDosage, setFormDosage] = useState('0.25');
-            const [formNote, setFormNote] = useState(''); // Keep state variable to prevent ReferenceError
+            // formNote 狀態保留以防其他函式引用，但 UI 已移除
+            const [formNote, setFormNote] = useState('');
             const [formSite, setFormSite] = useState('腹部');
             const [formHeight, setFormHeight] = useState('');
             const [formSymptoms, setFormSymptoms] = useState([]);
@@ -335,10 +335,8 @@
                     const currentRemaining = parseFloat(stats.remaining);
                     
                     if (dose > currentRemaining) {
-                        const confirmMsg = `⚠️ 剩餘劑量不足！\n\n目前剩餘：${currentRemaining} mg\n預計施打：${dose} mg\n\n這可能會用到下一支筆，確定要儲存嗎？`;
-                        if (!window.confirm(confirmMsg)) {
-                            return; 
-                        }
+                        setShowInsufficientModal(true);
+                        return; 
                     }
                 }
 
@@ -370,6 +368,15 @@
                     }
                 }
 
+                // 編輯邏輯修正：如果是編輯，應保留原有的 penCount，除非是新紀錄
+                let targetPenCount = recordType === 'injection' ? userProfile.penCount : null;
+                if (editingId) {
+                    const originalRecord = records.find(r => r.id === editingId);
+                    if (originalRecord && originalRecord.penCount) {
+                        targetPenCount = originalRecord.penCount;
+                    }
+                }
+
                 const newRecord = {
                     id: editingId || Date.now(),
                     date: formDate,
@@ -377,8 +384,8 @@
                     dosage: dose,
                     site: recordType === 'injection' ? formSite : '',
                     symptoms: recordType === 'injection' ? formSymptoms : [],
-                    penCount: recordType === 'injection' ? userProfile.penCount : null,
-                    note: formNote // Note kept for data integrity
+                    penCount: targetPenCount, // 使用修正後的 penCount
+                    note: formNote 
                 };
 
                 if (editingId) setRecords(prev => prev.map(r => r.id === editingId ? newRecord : r));
@@ -651,7 +658,7 @@
                         )}
 
                         {activeTab === 'dashboard' && (
-                            <div className="space-y-4 pb-48"> {/* Increased padding bottom for dashboard */}
+                            <div className="space-y-4 pb-48"> 
                                 {stats.lastDose > 0 && stats.dosesLeft <= 2 && (
                                     <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start gap-3 animate-pulse shadow-sm">
                                         <AlertCircle className="text-orange-500 shrink-0 mt-0.5" size={20} />
@@ -670,10 +677,8 @@
                                         <h3 className="font-bold text-slate-700 flex items-center gap-2"><Syringe className="text-primary-600" size={20} />藥物監控</h3>
                                         <div className="flex flex-col items-end">
                                             <span className="text-xs text-slate-400 font-bold mb-0.5 bg-slate-100 px-2 py-0.5 rounded-full">第 {userProfile.penCount} 支</span>
-                                            <div className="mt-1">
-                                                <span className="text-sm font-bold text-primary-700">約 {stats.dosesLeft} 次</span>
-                                                <span className="text-[10px] text-slate-400 ml-1">(以 {stats.calculationBaseDose}mg 推算)</span>
-                                            </div>
+                                            <span className="text-sm font-bold text-primary-700">約 {stats.dosesLeft} 次</span>
+                                            <span className="text-[10px] text-slate-400 ml-1">(以 {stats.calculationBaseDose}mg 推算)</span>
                                         </div>
                                     </div>
                                     <SyringeGauge percentage={stats.progressPercent} remaining={stats.remaining} remainingClicks={stats.remainingClicks} />
@@ -737,7 +742,7 @@
                         )}
 
                         {activeTab === 'add' && (
-                            <div className="animate-fade-in space-y-4 pb-48"> {/* Increased padding bottom for add screen */}
+                            <div className="animate-fade-in space-y-4 pb-64"> 
                                 <Card className="p-5 border-primary-100 shadow-sm bg-white">
                                     <h2 className="text-lg font-bold text-slate-800 mb-5 flex items-center gap-2 border-b border-slate-100 pb-3">
                                         {editingId ? <Edit2 className="text-primary-600" /> : <Plus className="text-primary-600" />} 
@@ -868,10 +873,7 @@
                                                     <label className="block text-sm font-bold text-slate-700 mb-1.5 flex items-center gap-2"><Stethoscope size={16} className="text-primary-600" />身體反應</label>
                                                     <div className="flex flex-wrap gap-2">
                                                         {COMMON_SYMPTOMS.map(sym => (
-                                                            <button key={sym} type="button" onClick={() => toggleSymptom(sym)} className={`px-3 py-1.5 text-xs rounded-full border transition font-bold flex items-center gap-1 ${formSymptoms.includes(sym) ? 'bg-orange-50 border-orange-400 text-orange-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
-                                                                {/* 簡單根據症狀加個小圖示 */}
-                                                                {sym}
-                                                            </button>
+                                                            <button key={sym} type="button" onClick={() => toggleSymptom(sym)} className={`px-3 py-1.5 text-xs rounded-full border transition font-bold flex items-center gap-1 ${formSymptoms.includes(sym) ? 'bg-orange-50 border-orange-400 text-orange-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{sym}</button>
                                                         ))}
                                                     </div>
                                                 </div>
@@ -1074,7 +1076,7 @@
                                     setEditingId(null); 
                                     setFormDate(new Date().toISOString().split('T')[0]); 
                                     setFormWeight(''); 
-                                    // setFormNote is fully removed
+                                    setFormNote('');
                                     setFormSymptoms([]); 
                                     setFormHeight(userProfile.height); 
                                     setRecordType('weight'); // Default to weight
